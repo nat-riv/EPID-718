@@ -1,0 +1,85 @@
+/********************************************************/
+/* Programmer: Natalie Rivadeneira					          	*/
+/* Date: 25 August 2022								                  */
+/* Purpose: EPID 718 coding exercise 2                  */
+/********************************************************/
+
+/* 1. Read in the data. */
+
+%let path = /*<filepath>*/; 
+libname d "&path";
+
+proc contents data=d.data2020_post1;
+ run;
+
+
+/*2. Crude association between exposure and outcome.*/
+
+*explore the crude association between influenza 
+  vaccination and infection in our study population with a 2x2 table;
+proc freq data=d.data2020_post1 ;
+table flu_vax*flu_inf/ riskdiff;
+run; 
+
+*calculate the risks of flu infection for 
+ vaccinated and unvaccinated participants, and estimate the risk ratio using a regression model.;
+
+proc genmod data=d.data2020_post1;
+ model flu_inf (event='1') = flu_vax/link=log dist=binomial;
+   estimate 'RR,crude' int 0 flu_vax 1;
+ run; 
+
+/*3. Potential for confounding.*/
+
+*tabulate each variable by exposure status.;
+proc freq data=d.data2020_post1;
+ table (age_group sex_f comorbid diabetes_screen) * flu_vax;
+ run;
+
+/*4. Propensity score model. */
+
+*Fit and interpret the beta coefficients of a propensity score model,;
+
+
+proc genmod data=d.data2020_post1;
+      class age_group (ref = '1') sex_f (ref = '1')comorbid (ref = '0') diabetes_screen (ref = '0');
+      model flu_vax (event = '1') = age_group sex_f comorbid diabetes_screen / link=logit dist=bin;
+      output out=prop_scores pred=ps; 
+
+run;
+
+
+*Explore the distribution of propensity scores in the total population and by vaccination 
+ status.;
+
+proc means data=prop_scores;
+      var ps;
+proc sgplot data=prop_scores;
+      hbox ps;
+run;
+
+
+/*5. Stratification by propensity score.*/
+
+data prop_scores_st;
+ set prop_scores;
+  if 0 <= ps < .1 then stratum = 1;
+  if .1 <= ps < .2 then stratum = 2;
+  if .2 <= ps < .3 then stratum = 3;
+  if .3 <= ps < .4 then stratum = 4;
+  if .4 <= ps < .5 then stratum = 5;
+  if .5 <= ps < .6 then stratum = 6;
+  if .6 <= ps < .7 then stratum = 7;
+  if .7 <= ps < .8 then stratum = 8;
+  if .8 <= ps < .9 then stratum = 9;
+  if .9 <= ps <= 1 then stratum = 10;
+  run;
+
+proc sort data = prop_scores_st;
+ by stratum;
+ run;
+
+ proc freq data = prop_scores_st;
+ by stratum;
+ table (age_group sex_f comorbid diabetes_screen) * flu_vax;
+ run;
