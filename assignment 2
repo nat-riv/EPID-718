@@ -1,3 +1,9 @@
 /*Code for EPID 716 Assignment 2*/
 
 
+proc freq data = births2015;
+table pnc5*preterm;
+run;
+
+
+
